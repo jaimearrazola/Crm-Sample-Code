@@ -1,3 +1,51 @@
+'use strict';
+
+var express  = require('express');
+var  app        = express();
+var  request    = require('request');
+var  vcapServices = require('vcap_services');
+var  extend     = require('util')._extend;
+
+// Bootstrap application settings
+require('./config/express')(app);
+
+// if bluemix credentials exists, then override local
+var credentials =  extend({
+  url: 'https://gateway.watsonplatform.net/dialog/api',
+  username: '<username>',
+  password: '<password>'
+}, vcapServices.getCredentials('dialog', 'standard')); // VCAP_SERVICES
+
+var apiIndex = credentials.url.indexOf('/api');
+if (apiIndex > 0) {
+  credentials.url = credentials.url.substring(0, apiIndex);
+}
+
+// HTTP proxy to the API
+app.use('/proxy', function(req, res, next) {
+  var newUrl = credentials.url + req.url;
+  req.pipe(request({
+    url: newUrl,
+    auth: {
+      user: credentials.username,
+      pass: credentials.password,
+      sendImmediately: true
+    }
+  }, next)).pipe(res);
+});
+
+// render index page
+app.get('/', function(req, res) {
+  res.render('index');
+});
+
+require('./config/error-handler')(app);
+
+module.exports = app;
+
+
+
+
 //instantiate our basic objects
 var express = require('express')
 var session = require('express-session')
